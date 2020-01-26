@@ -2,6 +2,8 @@ import subprocess
 import json
 import csv
 import datetime
+import smtplib
+from email.message import EmailMessage
 
 
 def run_speedtest():
@@ -13,6 +15,8 @@ def run_speedtest():
     if error:
         print('An error occurred: {}'.format(error))
         exit(1)
+
+    print('Speedtest complete.\n')
 
     return output
 
@@ -31,6 +35,7 @@ def test_data():
 
 def process_results(raw_result):
     print('Parsing results...')
+
     result = json.loads(raw_result)
     timestamp = result['timestamp']
     download = result['download']
@@ -49,7 +54,7 @@ def read_tests(filename):
         for row in csvreader:
             rows.append(row)
 
-    print("Total no. of rows: %d" % csvreader.line_num)
+    print(f'Total number of test results: {csvreader.line_num}')
 
     for row in rows:
         # parsing each column of a row
@@ -59,6 +64,8 @@ def read_tests(filename):
 
 
 def record_test(timestamp, download, upload, ping):
+    print('Logging test...')
+
     date = datetime.datetime.today().strftime('%Y-%m-%d')
     filename = f'{date}.csv'
 
@@ -69,13 +76,42 @@ def record_test(timestamp, download, upload, ping):
         csvwriter = csv.writer(csvfile)
         csvwriter.writerow(row)
 
-    print('Test logged.')
-    read_tests(filename)
+    print('Test logged.\n')
+
+
+def email_results(sender, recipient, report):
+    print('Emailing report...')
+
+    filetype_index = report.find('.')
+    test_date = report[0: filetype_index]
+
+    with open(report) as body:
+        msg = EmailMessage()
+        msg.set_content(body.read())
+
+    subject = f'Speedtest report for {test_date}'
+    msg['Subject'] = subject
+    msg['From'] = sender
+    msg['To'] = recipient
+
+    # TODO send email once SMTP server set up
+    # Send the message via local SMTP server.
+    # s = smtplib.SMTP('localhost')
+    # s.send_message(msg)
+    # s.quit()
+
+    print(f'Subject: {subject}\nSender: {sender}\nRecipient: {recipient}\nBody: {msg.get_content()}')
+    print('Email sent.\n')
 
 
 def main():
-    raw_result = test_data()
+    raw_result = run_speedtest()
     process_results(raw_result)
+
+    # TODO only run every 24 hours (or as scheduled)
+    today = datetime.datetime.today().strftime('%Y-%m-%d')
+    report = f'{today}.csv'
+    email_results('foo@example.com', 'boo@example.com', report)
 
 
 main()
